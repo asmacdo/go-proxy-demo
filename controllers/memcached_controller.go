@@ -17,23 +17,25 @@ limitations under the License.
 package controllers
 
 import (
+	"os"
+	"reflect"
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
-	"time"
 
 	"context"
 
-	proxy "github.com/operator-framework/operator-lib/proxy"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	cachev1alpha1 "github.com/example/memcached-operator/api/v1alpha1"
+	"github.com/operator-framework/operator-lib/proxy"
 )
 
 // MemcachedReconciler reconciles a Memcached object
@@ -81,14 +83,16 @@ func (r *MemcachedReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	err = r.Get(ctx, types.NamespacedName{Name: memcached.Name, Namespace: memcached.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
-		// os
 		dep := r.deploymentForMemcached(memcached)
-		proxyVars := proxy.ReadProxyVarsFromEnv()
-		for _, container := range dep.Spec.Template.Spec.Containers {
-			container.Env = append(container.Env, proxyVars...)
+		os.Setenv("HTTP_PROXY", "hello1")
+		// proxyVars := proxy.ReadProxyVarsFromEnv()
+		for i, container := range dep.Spec.Template.Spec.Containers {
+			dep.Spec.Template.Spec.Containers[i].Env = append(container.Env, proxy.ReadProxyVarsFromEnv()...)
 		}
 
 		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
+		log.Info("GET SPEC", "DEPLOYMENT CONTAINERS", dep.Spec.Template.Spec.Containers)
+
 		err = r.Create(ctx, dep)
 		if err != nil {
 			log.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
@@ -147,6 +151,10 @@ func (r *MemcachedReconciler) deploymentForMemcached(m *cachev1alpha1.Memcached)
 	ls := labelsForMemcached(m.Name)
 	replicas := m.Spec.Size
 
+	// Just for testing
+	// os.Setenv("HTTP_PROXY", "HIYA")
+	// proxyVars := proxy.ReadProxyVarsFromEnv()
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
@@ -164,12 +172,14 @@ func (r *MemcachedReconciler) deploymentForMemcached(m *cachev1alpha1.Memcached)
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{{
 						Image:   "memcached:1.4.36-alpine",
-						Name:    "memcached",
+						Name:    "memcacheddddd",
 						Command: []string{"memcached", "-m=64", "-o", "modern", "-v"},
 						Ports: []corev1.ContainerPort{{
 							ContainerPort: 11211,
 							Name:          "memcached",
 						}},
+						// Env: proxyVars,
+						// Env: []corev1.EnvVar{},
 					}},
 				},
 			},

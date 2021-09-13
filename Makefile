@@ -120,7 +120,10 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/default | kubectl delete -f -
+	$(KUSTOMIZE) build config/default | kubectl delete -f - --ignore-not-found=true
+
+sample:
+	kubectl apply -f config/samples/cache_v1alpha1_memcached.yaml
 
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
